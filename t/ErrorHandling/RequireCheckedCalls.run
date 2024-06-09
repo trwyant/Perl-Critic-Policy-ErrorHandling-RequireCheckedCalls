@@ -1,0 +1,80 @@
+## name Unchecked subroutine
+## parms { subroutines => 'fubar' }
+## failures 1
+## cut
+
+fubar();
+my $foo = fubar;    # Not checked because value assigned
+
+#-----------------------------------------------------------------------------
+
+## name Unchecked assigned subroutine
+## parms { check_assigned => 1, subroutines => 'fubar' }
+## failures 2
+## cut
+
+fubar();
+my $foo = fubar;
+
+#-----------------------------------------------------------------------------
+
+## name Checked subroutine
+## parms { subroutines => 'fubar' }
+## failures 0
+## cut
+
+fubar() or return;
+unless ( fubar ) {
+    die;
+}
+
+#-----------------------------------------------------------------------------
+
+## name Things that look like subroutines but are not
+## parms { subroutines => 'fubar' }
+## failures 0
+## cut
+
+Foo->fubar();   # Method
+fubar->baz();   # Class name
+
+
+#-----------------------------------------------------------------------------
+
+## name Unchecked method
+## parms { check_assigned => 1, methods => 'fubar Foo->bar' }
+## failures 3
+## cut
+
+$foo->fubar();
+my $bar = $foo->fubar;
+my $baz = Foo->bar( 42 );
+
+#-----------------------------------------------------------------------------
+
+## name Checked method
+## parms { methods => 'fubar Foo->bar' }
+## failures 0
+## cut
+
+$foo->fubar() or die;
+my $bar = $foo->fubar || $default;
+my $baz = Foo->bar( 42 ) // return;
+
+#-----------------------------------------------------------------------------
+
+## name A subroutine is not a method
+## parms { methods => 'fubar Foo->bar' }
+## failures 0
+## cut
+
+fubar;
+
+# Local Variables:
+#   mode: cperl
+#   cperl-indent-level: 4
+#   fill-column: 78
+#   indent-tabs-mode: nil
+#   c-indentation-style: bsd
+# End:
+# ex: set ts=8 sts=4 sw=4 tw=78 ft=perl expandtab shiftround :
