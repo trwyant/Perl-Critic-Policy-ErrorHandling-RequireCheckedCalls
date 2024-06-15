@@ -17,12 +17,17 @@ our $VERSION = '0.000_001';
 Readonly::Scalar my $DESC => q{Return value of %s %s ignored};
 Readonly::Scalar my $EXPL => [208, 278];
 
-Readonly::Scalar my $DEREF  => q/->/;
-
 #-----------------------------------------------------------------------------
 
 sub supported_parameters {
     return (
+        {
+            name            => 'accept_operators',
+            description     =>
+                'The set of operators that constitute a check',
+            behavior        => 'string list',
+            default_string  => 'or',
+        },
         {
             name            => 'check_assigned',
             description     => 'Check calls whose value is assigned to a variable',
@@ -70,6 +75,14 @@ sub initialize_if_enabled {
 
 #-----------------------------------------------------------------------------
 
+sub prepare_to_scan_document {
+    my ( $undef, $doc ) = @_;
+    $doc->index_locations();
+    return $TRUE;
+}
+
+#-----------------------------------------------------------------------------
+
 # This code is liberated from Perl::Critic::Utils::is_unchecked_call(), and
 # modified to handle both method calls and calls whose return value is
 # assigned.
@@ -94,43 +107,68 @@ sub violates {
         }
     }
 
-    if ( my $statement = $elem->statement() ) {
+    $self->_check_or( $elem )
+        and return;
 
-        # "open or die" is OK.
-        # We can't check snext_sibling for 'or' since the next siblings can be
-        # an unknown number of arguments to the call. Instead, check all of
-        # the elements to this statement to see if we find 'or', '||, or '//'.
-        # Unlike Perl::Critic::Utils::is_unchecked_call(), we do not check for
-        # '|'.
-
-        my $or_operators = sub  {
-            my ( undef, $elem ) = @_;  ## no critic(Variables::ProhibitReusedNames)
-            state $or_or_or = { hashify( qw( or || // ) ) };
-            return $elem->isa( 'PPI::Token::Operator' ) &&
-                $or_or_or->{ $elem->content() };
-        };
-
-        return if $statement->find( $or_operators );
-
-        if( my $parent = $elem->statement()->parent() ){
-
-            # Check if we're in an if( open ) {good} else {bad} condition
-            return  if $parent->isa('PPI::Structure::Condition');
-
-            # Return val could be captured in data structure and checked later
-            return if $parent->isa('PPI::Structure::Constructor') &&
-                $self->{_dont_check_assigned};
-
-            # "die if not ( open() )" - It's in list context.
-            if ( $parent->isa('PPI::Structure::List') ) {
-                if( my $uncle = $parent->sprevious_sibling() ){
-                    return if $uncle;
-                }
-            }
-        }
-    }
+    $self->_check_statement_parent( $elem )
+        and return;
 
     return $self->violation( sprintf( $DESC, $kind, $name ), $EXPL, $elem );
+}
+
+#-----------------------------------------------------------------------------
+
+# Check for things like 'fubar or die'. Return true if found, otherwise return
+# false.
+sub _check_or {
+    my ( $self, $elem ) = @_;
+    my $statement = $elem->statement()
+        or return $FALSE;
+
+    my ( $elem_line, $elem_row ) = @{ $elem->location() || [] };
+    if ( keys %{ $self->{_accept_operators} } ) {
+        foreach my $oper (
+            @{ $statement->find( 'PPI::Token::Operator' ) || [] }
+        ) {
+            # Ensure that the operator comes after the element we're
+            # analyzing.
+            my ( $oper_line, $oper_row ) = @{ $oper->location() || [] };
+            $elem_line > $oper_line
+                and next;
+            $elem_row > $oper_row
+                and next;
+
+            $self->{_accept_operators}{ $oper->content() }
+                and return $TRUE;
+        }
+    }
+    return $FALSE;
+}
+
+#-----------------------------------------------------------------------------
+
+# Miscellaneous checks on the parent of the statement the element is in.
+# Return true if one of the checks passes, else return false.
+sub _check_statement_parent {
+    my ( $self, $elem ) = @_;
+
+    my $parent = $elem->statement()->parent()
+        or return $FALSE;
+
+    # Check if we're in an if( open ) {good} else {bad} condition
+    return $TRUE if $parent->isa( 'PPI::Structure::Condition' );
+
+    # Return val could be captured in data structure and checked later
+    return $TRUE if $parent->isa('PPI::Structure::Constructor') &&
+        $self->{_dont_check_assigned};
+
+    # "die if not ( open() )" - It's in list context.
+    # FIXME this comes from Perl::Critic::Utils::is_unchecked_call(), but I
+    # have my doubts about it.
+    return $TRUE if $parent->isa( 'PPI::Structure::List' ) &&
+        $parent->sprevious_sibling();
+
+    return $FALSE;
 }
 
 #-----------------------------------------------------------------------------
@@ -202,18 +240,36 @@ This policy checks a configurable list of subroutine and method names. These
 B<must> be configured, as none are provided by default. If none are specified,
 this policy silently disables itself.
 
+=head2 accept_operators
+
+One of the ways to check a call is with a suffix Boolean. By default, only
+C<'or'> is accepted. If you want to accept C<'||'> as well, put an entry in
+your F<.perlcriticrc> file like this:
+
+    [ErrorHandling::RequireCheckedCalls]
+    accept_operators = or ||
+
+B<Note> that if you configure C<'accept_operators'> and want C<'or'> in the
+list of accepted operators you must specify it explicitly.
+
+=head2 check_assigned
+
 Normally, values that are assigned are B<not> checked, since the value can
 always be checked later, e.g.
 
- my $value = fubar();
- $value or die;
+    my $value = fubar();
+    $value or die;
 
-If you wish to check these, put an entry in a F<.perlcriticrc> file like this:
+If you wish to check these, put an entry in your F<.perlcriticrc> file like
+this:
 
     [ErrorHandling::RequireCheckedCalls]
     check_assigned = 1
 
-To configure subroutines, put an entry in a F<.perlcriticrc> file like this:
+=head2 subroutines
+
+To configure subroutines, put an entry in your F<.perlcriticrc> file like
+this:
 
     [ErrorHandling::RequireCheckedCalls]
     subroutines = foo bar
@@ -221,7 +277,9 @@ To configure subroutines, put an entry in a F<.perlcriticrc> file like this:
 The above will check B<only> regular subroutine calls. It will ignore
 object-oriented calls to methods C<foo()> or C<bar()>.
 
-To configure methods, put an entry in a F<.perlcriticrc> file like this:
+=head2 methods
+
+To configure methods, put an entry in your F<.perlcriticrc> file like this:
 
     [ErrorHandling::RequireCheckedCalls]
     methods = foo bar Static->baz

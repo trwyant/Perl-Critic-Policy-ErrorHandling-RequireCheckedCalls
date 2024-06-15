@@ -18,15 +18,45 @@ my $foo = fubar;
 
 #-----------------------------------------------------------------------------
 
+## name Wrong order
+## parms { subroutines => 'fubar' }
+## failures 1
+## cut
+
+baz or fubar;
+
+#-----------------------------------------------------------------------------
+
 ## name Checked subroutine
 ## parms { subroutines => 'fubar' }
 ## failures 0
 ## cut
 
 fubar() or return;
+baz or fubar or return;
 unless ( fubar ) {
     die;
 }
+
+#-----------------------------------------------------------------------------
+
+## name No tight-binding alternation by default
+## parms { subroutines => 'fubar' }
+## failures 2
+## cut
+
+fubar() || return;
+fubar // return;
+
+#-----------------------------------------------------------------------------
+
+## name Can specify operators that constitute check
+## parms { accept_operators => 'or || //', subroutines => 'fubar' }
+## failures 0
+## cut
+
+fubar() || return;
+fubar // return;
 
 #-----------------------------------------------------------------------------
 
@@ -53,7 +83,7 @@ my $baz = Foo->bar( 42 );
 #-----------------------------------------------------------------------------
 
 ## name Checked method
-## parms { check_assigned => 1, methods => 'fubar Foo->bar' }
+## parms { accept_operators => 'or || //', check_assigned => 1, methods => 'fubar Foo->bar' }
 ## failures 0
 ## cut
 
