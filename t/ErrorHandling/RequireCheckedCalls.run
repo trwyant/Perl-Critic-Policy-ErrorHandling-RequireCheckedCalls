@@ -53,7 +53,7 @@ my $baz = Foo->bar( 42 );
 #-----------------------------------------------------------------------------
 
 ## name Checked method
-## parms { methods => 'fubar Foo->bar' }
+## parms { check_assigned => 1, methods => 'fubar Foo->bar' }
 ## failures 0
 ## cut
 
