@@ -25,6 +25,7 @@ Readonly::Scalar my $REF_ARRAY  => ref [];
 my %opt;
 
 GetOptions( \%opt, qw{
+        accept_operators|accept-operators|operators=s@
         check_assigns|check-assigns|assigns|assignments!
         methods=s@
         subroutines=s@
@@ -107,6 +108,30 @@ The following options are accepted by this script. They are documented
 with leading double dashes, but single dashes are accepted, as are
 unique abbreviations.
 
+=head2 --accept-operators
+
+This option specifies the operators following the call that constitute a
+check. These operators need not follow immediately. Multiple operators
+can be specified as a quoted and space-delimited value, as multiple
+C<--accept-operators> options, or both.
+
+The default is C<--accept-operators=or>.
+
+=head2 --assignments
+
+This Boolean option is an alias for L<--check-assigns|/--check-assigns>.
+
+=head2 --assigns
+
+This Boolean option is an alias for L<--check-assigns|/--check-assigns>.
+
+=head2 --check-assigns
+
+If this Boolean option is asserted, calls whose results are assigned to
+a variable are also checked.
+
+The default is C<--no-check-assigns>.
+
 =head2 --format
 
  --format 5
@@ -128,6 +153,10 @@ value of the form C<< Class->method >> specifies a static method call on
 a specific class.
 
 At least one of C<--methods> or C<--subroutines> must be specified.
+
+=head2 --operators
+
+This option is an alias for L<--accept-operators|/--accept-operators>.
 
 =head2 --subroutines
 
