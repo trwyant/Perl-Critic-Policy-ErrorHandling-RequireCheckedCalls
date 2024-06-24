@@ -123,7 +123,7 @@ sub violates {
         }
     }
 
-    $self->_check_or( $elem )
+    $self->_check_oper( $elem )
         and return;
 
     $self->_check_statement_parent( $elem )
@@ -136,7 +136,7 @@ sub violates {
 
 # Check for things like 'fubar or die'. Return true if found, otherwise return
 # false.
-sub _check_or {
+sub _check_oper {
     my ( $self, $elem ) = @_;
     my $statement = $elem->statement()
         or return $FALSE;
@@ -151,7 +151,8 @@ sub _check_or {
             my ( $oper_line, $oper_row ) = @{ $oper->location() || [] };
             $elem_line > $oper_line
                 and next;
-            $elem_row > $oper_row
+            $elem_line == $oper_line
+                and $elem_row > $oper_row
                 and next;
 
             $self->{_accept_operators}{ $oper->content() }
