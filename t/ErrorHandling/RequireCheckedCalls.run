@@ -40,6 +40,17 @@ unless ( fubar ) {
 
 #-----------------------------------------------------------------------------
 
+## name Check everything. Do not try this at home.
+## parms { subroutines => ':all' }
+## failures 3
+## cut
+
+foo();
+bar;
+some_fairly_long_subroutine_name;
+
+#-----------------------------------------------------------------------------
+
 ## name No tight-binding alternation by default
 ## parms { subroutines => 'fubar' }
 ## failures 2

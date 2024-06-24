@@ -17,6 +17,9 @@ our $VERSION = '0.000_001';
 Readonly::Scalar my $DESC => q{Return value of %s %s ignored};
 Readonly::Scalar my $EXPL => [208, 278];
 
+Readonly::Scalar my $ALL    => ':all';
+Readonly::Scalar my $ALL_BUT    => ':all_but';
+
 #-----------------------------------------------------------------------------
 
 sub supported_parameters {
@@ -58,19 +61,32 @@ sub applies_to           { return 'PPI::Token::Word'     }
 sub initialize_if_enabled {
     my ( $self ) = @_;
 
+    keys %{ $self->{_methods} }
+        or keys %{ $self->{_subroutines} }
+        or return $FALSE;
+
     $self->{_dont_check_assigned} = ! delete $self->{_check_assigned};
 
-    if ( keys %{ $self->{_methods} } ) {
-        foreach ( keys %{ $self->{_methods} } ) {
-            m/ -> /smx
-                or next;
-            $self->{_static_methods} = $TRUE;
-            last;
-        }
-        return $TRUE;
-    } else {
-        return keys %{ $self->{_subroutines} } ? $TRUE : $FALSE;
+    foreach ( keys %{ $self->{_methods} } ) {
+        m/ -> /smx
+            or next;
+        $self->{_static_methods} = $TRUE;
+        last;
     }
+
+    foreach ( qw{ methods subroutines } ) {
+        my $attr = "_$_";
+        my $invert;
+        foreach ( $ALL, $ALL_BUT ) {
+            delete $self->{$attr}{$_}
+                and $invert++;
+        }
+        $self->{"_check_$_"} = $invert ?
+            sub { return ! $self->{$attr}{$_[0]} } :
+            sub { return $self->{$attr}{$_[0]} };
+    }
+
+    return $TRUE;
 }
 
 #-----------------------------------------------------------------------------
@@ -181,7 +197,7 @@ sub _want_to_check {
     my ( $self, $elem ) = @_;
     my $name = $elem->content();
     if ( is_method_call( $elem ) ) {
-        return( method => $name ) if $self->{_methods}{$name};
+        return( method => $name ) if $self->{_check_methods}->( $name );
         return if ! $self->{_static_methods};
         my $prev_sib = $elem->sprevious_sibling()
             or return;
@@ -191,9 +207,9 @@ sub _want_to_check {
             and $prev_sib->isa( 'PPI::Token::Word' )
             or return;
         substr $name, 0, 0, $prev_sib->content() . '->';
-        return ( method => $name ) if $self->{_methods}{$name};
+        return ( method => $name ) if $self->{_check_methods}->( $name );
     } elsif ( is_function_call( $elem ) ) {
-        return( subroutine => $name ) if $self->{_subroutines}{$name};
+        return( subroutine => $name ) if $self->{_check_subroutines}->( $name );
     }
     return;
 }
@@ -277,6 +293,18 @@ this:
 The above will check B<only> regular subroutine calls. It will ignore
 object-oriented calls to methods C<foo()> or C<bar()>.
 
+In addition to actual subroutines, you can specify C<':all'> to check all
+subroutines, or C<':all_but'> to check all subroutines except the named ones.
+These are actually equivalent, but saying C<subroutines=:all_but> looks even
+stranger than saying C<subroutines=:all foo bar>.
+
+L<Perl::Critic::Policy::InputOutput::RequireCheckedSyscalls|Perl::Critic::Policy::InputOutput::RequireCheckedSyscalls>
+has a caveat on the use of its C<:all> selector, and more or less the same
+thing applies to this policy. The reason for including them is that I thought
+it might be easier to implement them than to explain why their use is a Really
+Bad Idea. But the gist of the explanation is simply that not all subroutines
+return an error indication.
+
 =head2 methods
 
 To configure methods, put an entry in your F<.perlcriticrc> file like this:
@@ -287,6 +315,10 @@ To configure methods, put an entry in your F<.perlcriticrc> file like this:
 The above will check B<only> object-oriented calls. Regular subroutine calls
 to C<foo()> or C<bar()> will be ignored. In addition, C<baz()> will be checked
 only if called as a static method on class C<Static>.
+
+You can also specify C<':all'> or C<':all_but'> here. See above under
+L<subroutines|/subroutines> for what they do and a little about why you do not
+want to use them.
 
 =head1 CREDITS
 
