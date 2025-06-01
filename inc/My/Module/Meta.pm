@@ -89,7 +89,7 @@ sub recommended_module_versions {
 }
 
 sub requires_perl {
-    return '5.008008';
+    return '5.010001';
 }
 
 
