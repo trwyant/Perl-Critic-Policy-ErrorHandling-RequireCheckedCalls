@@ -38,11 +38,13 @@ jobs:
         # systems
         include:
           - runner: ubuntu-latest
-            perl: '5.10.1'
+            # v5.8.8 is the earliest known to work
+            perl: '5.8.8'
           - runner: macos-latest
-            perl: '5.10.1'
+            # v5.8.8 is the earliest known to work
+            perl: '5.8.8'
           - runner: windows-latest
-            # v5.26.8 is the earliest known to work
+            # v5.26.0 is the earliest known to work
             perl: '5.26.0'
     # Define where the job runs.
     # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idruns-on
